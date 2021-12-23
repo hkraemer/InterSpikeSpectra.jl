@@ -40,36 +40,36 @@ function get_maxima(s::Vector{T}) where {T}
 end
 
 @testset "InterSpikeSpectra.jl" begin
-    N = 300
-    period1 = 12
-    period2 = 52
+    N = 50
+    period1 = 13
+    period2 = 8
     test_tauRR2 = InterSpikeSpectra.create_single_basis_function(N, period1)
     test_tauRR3 = InterSpikeSpectra.create_single_basis_function(N, period2)
 
     # all 1's
-    test_tauRR = abs.(ones(N).*0.7) .* test_tauRR2[11,:]
-    test_tauRR_ = abs.(ones(N).*0.8) .* test_tauRR3[30,:]
+    test_tauRR = abs.(ones(N).*0.7) .* test_tauRR2[3,:]
+    test_tauRR_ = abs.(ones(N).*0.8) .* test_tauRR3[7,:]
     test_tauRR = test_tauRR .+ test_tauRR_
     test_tauRR = test_tauRR ./ maximum(test_tauRR)
 
     spectrum, ρ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR; ρ_thres = 0.85)
-    @test 0.85 <= ρ < 0.86
+    @test 0.83 <= ρ < 0.87
 
     spectrum, ρ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR)
 
     maxis, max_idx = get_maxima(spectrum)
-    t_idx = maxis .> 0.5
+    t_idx = maxis .> 0.4
     peak_idxs = max_idx[t_idx]
 
-    @test 0.99 <= ρ < 0.991
+    @test 0.989 <= ρ < 0.991
     @test length(peak_idxs) == 2
-    @test peak_idxs[1] == period1
-    @test peak_idxs[2] == period2
+    @test peak_idxs[1] == period2
+    @test peak_idxs[2] == period1
 
     # randomized peak heights
     test_tauRR = abs.(randn(N)) .* test_tauRR2[1,:]
     test_tauRR /= maximum(test_tauRR)
-    @time spectrum = InterSpikeSpectra.inter_spike_spectrum(test_tauRR)
+    @time spectrum, _ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR)
 
     maxis, max_idx = get_maxima(spectrum)
     t_idx = maxis .> 0.01
