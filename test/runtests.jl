@@ -53,12 +53,12 @@ end
     test_tauRR = test_tauRR ./ maximum(test_tauRR)
 
     spectrum, ρ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR; ρ_thres = 0.85)
-    @test 0.83 <= ρ < 0.87
+    @test 0.83 <= ρ < 0.88
 
     spectrum, ρ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR)
 
     maxis, max_idx = get_maxima(spectrum)
-    t_idx = maxis .> 0.4
+    t_idx = maxis .> 0.3
     peak_idxs = max_idx[t_idx]
 
     @test 0.989 <= ρ < 0.991

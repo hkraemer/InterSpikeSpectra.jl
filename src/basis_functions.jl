@@ -20,8 +20,9 @@ function inter_spike_spectrum(s::Vector{T}; ρ_thres::Real = 0.99) where {T}
 
     N = length(s)
     Θ = generate_basis_functions(N)'
-    Lf = fit(LassoPath, Θ, s; standardize = false, intercept = false)
-    ys = Lf.coefs
+    path = glmnet(Θ, s)
+    # fit(LassoPath, Θ, s; standardize = false, intercept = false)
+    ys = path.betas
 
     y, ρ = pick_the_right_coefs(ys, s, sparse(Θ), ρ_thres)
 
@@ -86,7 +87,7 @@ end
 
 # compute those coeffs, which would return in a regenerated signal, from which
 # the correlation to the true signal is closest to ρ_thres
-function pick_the_right_coefs(ys::SparseMatrixCSC, s::Vector, Θ::SparseMatrixCSC, ρ_thres::Real)
+function pick_the_right_coefs(ys::CompressedPredictorMatrix, s::Vector, Θ::SparseMatrixCSC, ρ_thres::Real)
     N, M = size(ys)
     @assert size(Θ,2) == N
     @assert size(Θ,1) == length(s)

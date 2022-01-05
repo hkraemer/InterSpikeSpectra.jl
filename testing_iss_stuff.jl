@@ -35,6 +35,21 @@ test_tauRR = abs.(randn(N)) .* test_tauRR2[1,:]
 test_tauRR /= maximum(test_tauRR)
 @time spectrum, _ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR)
 
+figure()
+plot(test_tauRR)
+
+s = test_tauRR
+N = length(s)
+Θ = InterSpikeSpectra.generate_basis_functions(N)'
+Lf = fit(LassoPath, Θ, s; standardize = false, intercept = false, λ=[0.001])
+ys = Lf.coefs
+
+y, ρ = pick_the_right_coefs(ys, s, sparse(Θ), ρ_thres)
+
+
+
+
+
 maxis, max_idx = get_maxima(spectrum)
 t_idx = maxis .> 0.01
 peak_idxs = max_idx[t_idx]
