@@ -67,9 +67,10 @@ end
     @test peak_idxs[2] == period1
 
     # randomized peak heights
+    Random.seed!(1234)
     test_tauRR = abs.(randn(N)) .* test_tauRR2[1,:]
     test_tauRR /= maximum(test_tauRR)
-    @time spectrum, _ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR)
+    @time spectrum, _ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR; ρ_thres=0.95)
 
     maxis, max_idx = get_maxima(spectrum)
     t_idx = maxis .> 0.01
