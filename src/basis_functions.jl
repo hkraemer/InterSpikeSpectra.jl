@@ -4,19 +4,21 @@
     inter_spike_spectrum(s::Vector) → spectrum, ρ
 
     Compute a spike `spectrum` from the a signal `s`, using a LASSO optimization.
-    `s` must be normalized to the unity interval `s ∈ [0 1]`. Second output `ρ`
-    is the linear Pearson correlation coeffiecient between the true input signal
-    `s` and the regenerated decomposed signal.
+    `s` will get normalized to the unity interval `s ∈ [0 1]` internally. Second
+    output `ρ` is the linear Pearson correlation coeffiecient between the true
+    input `s` and the regenerated decomposed signal.
 
     Keyword arguments:
-    `ρ_thres=0.99`: The agreement of the regenerated decomposed signal with the
+    `ρ_thres=0.95`: The agreement of the regenerated decomposed signal with the
                     true signal. This depends on the LASSO regularization parameter
                     `λ`. `λ` gets adjusted automatically with respect to `ρ_thres`.
 """
-function inter_spike_spectrum(s::Vector{T}; ρ_thres::Real = 0.99) where {T}
-    @assert sum(s.<0)==0 "Please supply a spike train input, which consists of only positive values."
-    @assert sum(s.>1)==0 "Please supply a spike train input, which consists of only positive values, not exceeding 1."
+function inter_spike_spectrum(s::Vector{T}; ρ_thres::Real = 0.95) where {T}
     @assert 0 < ρ_thres <= 1
+
+    # normalization
+    s .-= minimum(s)
+    s ./= maximum(s)
 
     N = length(s)
     Θ = generate_basis_functions(N)'

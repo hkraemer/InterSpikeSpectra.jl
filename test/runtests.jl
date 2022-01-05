@@ -51,12 +51,11 @@ end
     test_tauRR = abs.(ones(N).*0.7) .* test_tauRR2[3,:]
     test_tauRR_ = abs.(ones(N).*0.8) .* test_tauRR3[7,:]
     test_tauRR = test_tauRR .+ test_tauRR_
-    test_tauRR = test_tauRR ./ maximum(test_tauRR)
 
     spectrum, ρ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR; ρ_thres = 0.85)
     @test 0.83 <= ρ < 0.88
 
-    spectrum, ρ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR)
+    spectrum, ρ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR; ρ_thres = 0.99)
 
     maxis, max_idx = get_maxima(spectrum)
     t_idx = maxis .> 0.3
@@ -70,8 +69,7 @@ end
     # randomized peak heights
     Random.seed!(1234)
     test_tauRR = abs.(randn(N)) .* test_tauRR2[1,:]
-    test_tauRR /= maximum(test_tauRR)
-    @time spectrum, _ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR; ρ_thres=0.95)
+    @time spectrum, _ = InterSpikeSpectra.inter_spike_spectrum(test_tauRR)
 
     maxis, max_idx = get_maxima(spectrum)
     t_idx = maxis .> 0.01
