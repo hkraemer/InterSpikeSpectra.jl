@@ -1,6 +1,7 @@
 using InterSpikeSpectra
 using RecurrenceAnalysis
 using Test
+using Random
 
 """
 Return the maxima of the given time series s and its indices
