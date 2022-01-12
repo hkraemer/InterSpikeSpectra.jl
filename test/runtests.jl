@@ -56,13 +56,13 @@ println("Begin testing InterSpikeSpectra.jl...")
     test_tauRR = test_tauRR + 0.05.*randn(N)
 
     threshold = 0.85
-    tol = 1e-2
+    tol = 1e-3
     spectrum, ρ = inter_spike_spectrum(test_tauRR; ρ_thres = threshold, tol = tol)
     @test abs(ρ - threshold) < tol
 
     threshold = 0.99
     tol = 1e-3
-    spectrum, ρ = inter_spike_spectrum(test_tauRR; ρ_thres = threshold, tol = tol)
+    spectrum, ρ = inter_spike_spectrum(test_tauRR; ρ_thres = threshold)
 
     maxis, max_idx = get_maxima(spectrum)
     t_idx = maxis .> 0.1
@@ -76,26 +76,54 @@ println("Begin testing InterSpikeSpectra.jl...")
     # randomized peak heights
     Random.seed!(1234)
     threshold = 0.95
-    tol = 1e-1
-    maxcycles = 100
+    tol = 1e-2
+    maxcycles = 20
     test_tauRR = abs.(randn(N)) .* test_tauRR2[1,:]
-    spectrum, _ = inter_spike_spectrum(test_tauRR; ρ_thres= threshold, tol = tol, maxλ = maxcycles)
+    spectrum, _ = inter_spike_spectrum(test_tauRR; ρ_thres= threshold, tol = tol, max_iter = maxcycles)
 
     maxis, max_idx = get_maxima(spectrum)
-    t_idx = maxis .> 0.001
+    t_idx = maxis .> 0.000001
     peak_idxs = max_idx[t_idx]
 
     @test sum(rem.(peak_idxs, period1)) == 0
 end
 
+@testset "Perfect spike train" begin
+
+    s = zeros(100)
+    period1 = 3
+    s[2:period1:end].= 1
+
+    spectrum, ρ = inter_spike_spectrum(s)
+
+    @test ρ+ 1e-3 >= 1
+    _, max_idx = get_maxima(spectrum)
+    @test length(max_idx) == 1
+    @test max_idx[1] == period1
+
+    period2 = 11
+    s[5:period2:end].= .8
+
+    tol = 1e-4
+    threshold = .99
+    spectrum, ρ = inter_spike_spectrum(s; ρ_thres=threshold, tol = tol)
+    @test abs(ρ - threshold) < tol
+    maxis, max_idx = get_maxima(spectrum)
+    @test length(max_idx) == 2
+    @test max_idx[1] == period1
+    @test max_idx[2] == period2 || max_idx[2] / max_idx[1] == period2
+    @test maxis[1] > maxis[2]
+
+end
+
 @testset "Random input" begin
     Random.seed!(1234)
     tol = 1e-4
-    maxcycles = 100
+    maxcycles = 20
     s = randn(50)
 
     threshold = 0.995
-    spectrum1, ρ = inter_spike_spectrum(s; ρ_thres = threshold, tol = tol, maxλ = maxcycles)
+    spectrum1, ρ = inter_spike_spectrum(s; ρ_thres = threshold, tol = tol, max_iter = maxcycles)
     maxis, _ = get_maxima(spectrum1)
     numpeaks1 = length(maxis)
     @test abs(ρ - threshold) <= tol

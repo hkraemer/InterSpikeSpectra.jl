@@ -7,64 +7,43 @@ using SparseArrays
 pygui(true)
 
 using InterSpikeSpectra
+using Revise
 using RecurrenceAnalysis
 using Test
 using Random
 using GLMNet
+using Statistics
+using SparseArrays
 
 
-Random.seed!(1234)
-N = 50
-period1 = 13
-period2 = 8
-test_tauRR2 = InterSpikeSpectra.create_single_basis_function(N, period1)
-test_tauRR3 = InterSpikeSpectra.create_single_basis_function(N, period2)
+s = zeros(100)
+period1 = 3
+s[2:period1:end].= 1
 
-# all 1's
-test_tauRR = abs.(ones(N).*0.7) .* test_tauRR2[3,:]
-test_tauRR_ = abs.(ones(N).*0.8) .* test_tauRR3[7,:]
-test_tauRR = test_tauRR .+ test_tauRR_
-test_tauRR = test_tauRR + 0.05.*randn(N)
+spectrum, ρ = inter_spike_spectrum(s)
 
+@test ρ+ 1e-3 >= 1
+_, max_idx = get_maxima(spectrum)
+@test length(max_idx) == 1
+@test max_idx[1] == period1
 
-##
-s = vec(readdlm("test_sig.csv"))
+period2 = 11
+s[5:period2:end].= .8
 
-
-s = (s.-mean(s)) ./ std(s)
-s .-= minimum(s)
-s ./= maximum(s)
-xs = deepcopy(s)
-
-N = length(s)
-Θ = InterSpikeSpectra.generate_basis_functions(N)'
-
-lambda_f = 0.1
-path = glmnet(sparse(Θ), view xs[:]; lambda = [lambda_f])
-y = path.betas
-# check whether the regenerated signal matches with the given
-
-rrr = cor(vec(InterSpikeSpectra.regenerate_signal(sparse(Θ), y)), s)
-
-
-threshold = 0.85
-tol = 1e-2
-spectrum, ρ = inter_spike_spectrum(test_tauRR; ρ_thres = threshold, tol = tol, maxλ=10)
-@test 0.83 <= ρ < 0.88
-
+tol = 1e-4
+threshold = .9999
+spectrum, ρ = inter_spike_spectrum(s; ρ_thres=threshold, tol = tol)
+@test abs(ρ - threshold) < tol
+maxis, max_idx = get_maxima(spectrum)
+@test length(max_idx) == 2
+@test max_idx[1] == period1
+@test max_idx[2] == period2
+@test maxis[1] > maxis[2]
 
 figure()
+subplot(211)
 plot(s)
 grid()
-
-
-spectrum, ρ = inter_spike_spectrum(test_tauRR; ρ_thres = 0.99)
-
-maxis, max_idx = get_maxima(spectrum)
-t_idx = maxis .> 0.3
-peak_idxs = max_idx[t_idx]
-
-@test 0.989 <= ρ < 0.991
-@test length(peak_idxs) == 2
-@test peak_idxs[1] == period2
-@test peak_idxs[2] == period1
+subplot(212)
+plot(spectrum)
+grid()

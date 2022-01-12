@@ -13,12 +13,13 @@
                       true signal. This depends on the LASSO regularization parameter
                       `λ`. `λ` gets adjusted automatically with respect to `ρ_thres`.
     `tol = 1e-3`: Allowed tolerance between `ρ_thres` and `ρ`.
-    `maxλ = 15`: Determines after how many tried Lambdas the algorithm stopps.
+    `max_iter = 15`: Determines after how many tried Lambdas the algorithm stopps.
+    `verbose::Bool=true`: If true, warning messages enabled.
 """
-function inter_spike_spectrum(s::Vector{T}; ρ_thres::Real = 0.95, tol::Real=1e-3, maxλ::Integer=15) where {T}
+function inter_spike_spectrum(s::Vector{T}; ρ_thres::Real = 0.95, tol::Real=1e-3, max_iter::Integer=15, verbose::Bool=true) where {T}
     @assert 0.8 <= ρ_thres <= 1 "Optional input `ρ_thres` must be a value in the interval [0.8, 1]"
     @assert 1e-5 <= tol <= 1 "Optional input `tol` must be a value in the interval [1e-5, 1]"
-    @assert 0 < maxλ <= 100 "Optional input `maxλ` must be an integer in the interval (0, 100]."
+    @assert 1 < max_iter <= 20 "Optional input `max_iter` must be an integer in the interval (1, 20]."
 
     # normalization
     s = (s.-mean(s)) ./ std(s)
@@ -28,80 +29,49 @@ function inter_spike_spectrum(s::Vector{T}; ρ_thres::Real = 0.95, tol::Real=1e-
     N = length(s)
     Θ = generate_basis_functions(N)'
 
-    return compute_spectrum_according_to_threshold(s, sparse(Θ), ρ_thres, tol, maxλ)
+    return compute_spectrum_according_to_threshold(s, sparse(Θ), ρ_thres, tol, max_iter, verbose)
 end
 
 """
     Determine the right regularization parameter with respect to ρ_thres & tol
     using the Newton-method.
 """
-function compute_spectrum_according_to_threshold(s::Vector, Θ::SparseMatrixCSC, ρ_thres::Real, tol::Real, maxλ::Integer)
-    # initial Lambda (start with least squares solution)
-    lambda_i = 0
-    # initial Lambda-step
-    lambda_step = 0.1
+function compute_spectrum_according_to_threshold(s::Vector, Θ::SparseMatrixCSC, ρ_thres::Real, tol::Real, max_iter::Integer, verbose::Bool)
 
-    pos = true          # indicates whether lambda_step is positive or not
-    upper = false       # indicates whether an upper limit for lambda has been reached
-    cond1 = false
-    flag = true
-    i = 0
-    while flag
+    # initial Lambda-step for estimating an upper bound for λ
+    lambda_step = 0.5
+    lambda_max, lambda_min, y_act, ρ_act = find_lambda_max(s, Θ, lambda_step, ρ_thres)
+    # bisection search
+    for i = 1:max_iter
+        # check whether max iterations or tolerance-level reached
+        if i == max_iter
+            if verbose
+                println("Algorithm stopped due to maximum number of λ's were tried without convergence to the specified `ρ_thres`")
+            end
+            return pool_frequencies(y_act, length(s)), ρ_act
+            break
+        elseif abs(ρ_act - ρ_thres) <= tol
+            return pool_frequencies(y_act, length(s)), ρ_act
+        end
 
-        lambda_f = lambda_i + lambda_step  # try new lambda
-        lambda_i = lambda_f                # update lambda for the next run
-
+        # try new lambda
+        actual_lambda = lambda_min + (lambda_max - lambda_min)/2
         # make the regression with specific lambda
-        path = glmnet(Θ, @view s[:]; lambda = [lambda_f])
-        y = path.betas
+        path = glmnet(Θ, @view s[:]; lambda = [actual_lambda])
         # check whether the regenerated signal matches with the given threshold
-        rr = cor(vec(regenerate_signal(Θ, y)), s)
+        rr = cor(vec(regenerate_signal(Θ, path.betas)), s)
 
-        # check whether max iterations are reached
-        i += 1
-        if i == maxλ + 1
-            println("Algorithm stopped due to maximum number of lambdas were tried without convergence. Please increase `tol`-input OR increae `maxlambdas` and if this does not help `correlation_threshold` must be higher.")
-            return zeros(length(s)), rr
-            flag = false
-        end
-        
-        # check whether upper limit is reached or convergence is fullfilled
-        if isnan(rr) || (rr - ρ_thres) < 0
-            upper = true
-        end
-        if (rr - ρ_thres) == 0 || abs(rr - ρ_thres) < tol
-            spectrum = pool_frequencies(y, length(s))
-            return spectrum, rr
-            flag = false
-        end
-
-        # alter lamba-steps
-        if !isnan(rr) && !upper
-            continue
-        elseif (rr - ρ_thres) < 0 || isnan(rr)
-            upper = true
-            if cond1
-                pos = true
-            else
-                pos = false
-            end
-            cond1 = true
-        elseif (rr - ρ_thres) > 0
-            if cond1
-                pos = false
-            else
-                pos = true
-            end
-            cond1 = false;
-        elseif isnan(rr) && !upper
-            upper = true
-            pos = false
-            cond1 = true
-        end
-        if pos
-            lambda_step = lambda_step/2 # split the interval
-        else
-            lambda_step = (lambda_step*(-1))/2 # split the interval
+        # pick the new bisection interval
+        if isnan(rr)
+            lambda_max = actual_lambda
+        elseif rr < ρ_thres
+            lambda_max = actual_lambda
+            y_act[:] = path.betas
+            ρ_act = rr
+        elseif rr > ρ_thres
+            lambda_min = actual_lambda
+            ρ_act = rr
+            y_act[:] = path.betas
         end
     end
 end
@@ -113,7 +83,8 @@ function regenerate_signal(Θ::SparseMatrixCSC, coefs::CompressedPredictorMatrix
 end
 
 # pool the same frequencies
-function pool_frequencies(y::CompressedPredictorMatrix, N::Integer)
+function pool_frequencies(y::Vector, N::Integer)
+    y = abs.(y)
     spectrum = zeros(N)
     cnt = 1
     for i = 1:N
@@ -128,6 +99,34 @@ function pool_frequencies(y::CompressedPredictorMatrix, N::Integer)
     return spectrum
 end
 
+# estimate a maximum λ-value for which the correlation coefficient form the re-
+# generated signal and the input signal falls below `ρ_thres` or is NaN.
+function find_lambda_max(s::Vector, Θ::SparseMatrixCSC, lambda_step::Real, ρ_thres::Real)
+    lambda = 0.
+    lambda_min = 0.
+    ρ_min = 1
+    y_min = zeros(size(Θ,2))
+    for i = 1:10000
+        # make the regression with specific lambda
+        path = glmnet(Θ, @view s[:]; lambda = [lambda])
+        # check whether the regenerated signal matches with the given threshold
+        rr = cor(vec(regenerate_signal(Θ, path.betas)), s)
+        if i == 1
+            y_min[:] = vec(path.betas)
+            ρ_min = rr
+        end
+
+        if rr > ρ_thres
+            lambda_min = lambda
+            y_min[:] = vec(path.betas)
+            ρ_min = rr
+        elseif isnan(rr) || rr <= ρ_thres
+            return lambda, lambda_min, y_min, ρ_min
+            break
+        end
+        lambda += lambda_step
+    end
+end
 
 """
     generate_basis_functions(N::Int) → basis

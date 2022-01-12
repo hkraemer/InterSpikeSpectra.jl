@@ -1,7 +1,7 @@
 name = "InterSpikeSpectra"
 uuid = "2a2b4b4d-1d85-44c5-81bd-1c3b0471c142"
 authors = ["K.Hauke Kraemer"]
-version = "0.3.0"
+version = "0.4.0"
 
 [deps]
 GLMNet = "8d5ece8b-de18-5317-b113-243142960cc6"
