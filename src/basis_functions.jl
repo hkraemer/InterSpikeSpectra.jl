@@ -170,22 +170,6 @@ function create_single_basis_function(N::Int, period::Int)
     return cs
 end
 
-# compute those coeffs, which would return in a regenerated signal, from which
-# the correlation to the true signal is closest to ρ_thres
-function pick_the_right_coefs(ys::CompressedPredictorMatrix, s::Vector, Θ::SparseMatrixCSC, ρ_thres::Real)
-    N, M = size(ys)
-    @assert size(Θ,2) == N
-    @assert size(Θ,1) == length(s)
-
-    ρs = zeros(M-1)
-    for i = 2:M
-        ρs[i-1] = cor(regenerate_signal(Θ, view(ys, ((i-1)*N)+1:i*N)), s)
-    end
-    d = abs.(ρ_thres .- ρs)
-    min_idx = argmin(d)
-    return ys[:,min_idx+1], ρs[min_idx]
-end
-
 # regenerate a decomposed signal from basis functions and its coefficients
 function regenerate_signal(Θ::Union{SparseMatrixCSC, Matrix}, coefs::Union{SparseVector, Vector, SubArray})
     @assert size(Θ,2) == length(coefs)
