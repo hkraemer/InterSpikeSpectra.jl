@@ -58,11 +58,15 @@ function compute_spectrum_according_to_threshold(s::Vector, Θ::SparseMatrixCSC,
                 if verbose
                     println("Algorithm stopped due to maximum number of λ's were tried without convergence to the specified `ρ_thres`")
                 end
-                return pool_frequencies(y_act, length(s)), ρ_act
+                spec = pool_frequencies(y_act, length(s))
+                spec = spec ./ sum(spec)
+                return spec , ρ_act
             end
             break
         elseif abs(ρ_act - ρ_thres) <= tol
-            return pool_frequencies(y_act, length(s)), ρ_act
+            spec = pool_frequencies(y_act, length(s))
+            spec = spec ./ sum(spec)
+            return spec , ρ_act
         end
 
         # try new lambda
