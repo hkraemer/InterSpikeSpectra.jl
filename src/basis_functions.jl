@@ -51,6 +51,7 @@ function compute_spectrum_according_to_threshold(s::Vector, Θ::SparseMatrixCSC,
                     println("Algorithm stopped due to maximum number of λ's were tried without convergence to the specified `ρ_thres`. Perfect deomposition achieved.")
                 end
                 spectrum_i = pool_frequencies(y_act, length(s))
+                spectrum_i = spectrum_i ./ sum(spectrum_i)
                 spectrum, y = compute_spectrum_according_to_actual_spectrum(spectrum_i, s, Θ, actual_lambda)
                 return spectrum, cor(vec(regenerate_signal(Θ, y)), s)
             else
@@ -104,6 +105,7 @@ function compute_spectrum_according_to_actual_spectrum(spectrum_i::Vector, s::Ve
         path = glmnet(Θ, @view s[:]; lambda = [actual_λ])
         y_act[:] = path.betas
         spectrum[:] = pool_frequencies(y_act, length(s))
+        spectrum = spectrum ./ sum(spectrum)
         # check whether the spectrum matches with the initial spectrum (input)
         rr = cor(spectrum, spectrum_i)
 
