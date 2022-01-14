@@ -76,7 +76,7 @@ println("Begin testing InterSpikeSpectra.jl...")
     # randomized peak heights
     Random.seed!(1234)
     threshold = 0.95
-    tol = 1e-2
+    tol = 1e-3
     maxcycles = 20
     test_tauRR = abs.(randn(N)) .* test_tauRR2[1,:]
     spectrum, _ = inter_spike_spectrum(test_tauRR; ρ_thres= threshold, tol = tol, max_iter = maxcycles)
@@ -97,7 +97,8 @@ end
     spectrum, ρ = inter_spike_spectrum(s)
 
     @test ρ+ 1e-3 >= 1
-    _, max_idx = get_maxima(spectrum)
+    maxis, max_idx = get_maxima(spectrum)
+    @test maxis[1] > 0.999
     @test length(max_idx) == 1
     @test max_idx[1] == period1
 

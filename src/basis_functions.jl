@@ -37,10 +37,11 @@ end
     using the Newton-method.
 """
 function compute_spectrum_according_to_threshold(s::Vector, Θ::SparseMatrixCSC, ρ_thres::Real, tol::Real, max_iter::Integer, verbose::Bool)
-
+    abs_tol = 1e-6
     # initial Lambda-step for estimating an upper bound for λ
     lambda_step = 0.5
     lambda_max, lambda_min, y_act, ρ_act = find_lambda_max(s, Θ, lambda_step, ρ_thres)
+    actual_lambda = 0
     # bisection search
     for i = 1:max_iter
         # check whether max iterations or tolerance-level reached
@@ -48,7 +49,13 @@ function compute_spectrum_according_to_threshold(s::Vector, Θ::SparseMatrixCSC,
             if verbose
                 println("Algorithm stopped due to maximum number of λ's were tried without convergence to the specified `ρ_thres`")
             end
-            return pool_frequencies(y_act, length(s)), ρ_act
+            if ρ_act > 1 - abs_tol
+                spectrum_i = pool_frequencies(y_act, length(s))
+                spectrum, y = compute_spectrum_according_to_actual_spectrum(spectrum_i, s, Θ, actual_lambda)
+                return spectrum, cor(vec(regenerate_signal(Θ, y)), s)
+            else
+                return pool_frequencies(y_act, length(s)), ρ_act
+            end
             break
         elseif abs(ρ_act - ρ_thres) <= tol
             return pool_frequencies(y_act, length(s)), ρ_act
@@ -74,6 +81,37 @@ function compute_spectrum_according_to_threshold(s::Vector, Θ::SparseMatrixCSC,
             y_act[:] = path.betas
         end
     end
+end
+
+"""
+    Determine the right regularization parameter with respect to ρ_thres & tol
+    using the Newton-method.
+"""
+function compute_spectrum_according_to_actual_spectrum(spectrum_i::Vector, s::Vector,  Θ::SparseMatrixCSC, λ_max::Real)
+    abs_tol = 1e-6
+    max_iter = 10 # precision
+    λ_min = 0
+    y_act = zeros(size(Θ,2))
+    spectrum = zeros(size(spectrum_i))
+    # bisection search
+    for i = 1:max_iter
+        # try new lambda
+        actual_λ = λ_min + (λ_max - λ_min)/2
+        # make the regression with specific lambda
+        path = glmnet(Θ, @view s[:]; lambda = [actual_λ])
+        y_act[:] = path.betas
+        spectrum[:] = pool_frequencies(y_act, length(s))
+        # check whether the spectrum matches with the initial spectrum (input)
+        rr = cor(spectrum, spectrum_i)
+
+        # pick the new bisection interval
+        if rr > 1-abs_tol
+            λ_max = actual_λ
+        elseif rr < 1-abs_tol
+            λ_min = actual_λ
+        end
+    end
+    return spectrum, y_act
 end
 
 # regenerate a decomposed signal from basis functions and its coefficients
