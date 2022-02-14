@@ -82,7 +82,7 @@ println("Begin testing InterSpikeSpectra.jl...")
     spectrum, _ = inter_spike_spectrum(test_tauRR; ρ_thres= threshold, tol = tol, max_iter = maxcycles)
 
     maxis, max_idx = get_maxima(spectrum)
-    t_idx = maxis .> 0.000001
+    t_idx = maxis .> 0.2
     peak_idxs = max_idx[t_idx]
 
     @test sum(rem.(peak_idxs, period1)) == 0
