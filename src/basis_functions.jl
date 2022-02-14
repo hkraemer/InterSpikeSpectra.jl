@@ -16,7 +16,7 @@
     `max_iter = 15`: Determines after how many tried Lambdas the algorithm stopps.
     `verbose::Bool=true`: If true, warning messages enabled.
 """
-function inter_spike_spectrum(s::Vector{T}; ρ_thres::Real = 0.99, tol::Real=1e-3, max_iter::Integer=15, verbose::Bool=true) where {T}
+function inter_spike_spectrum3(s::Vector{T}; ρ_thres::Real = 0.99, tol::Real=1e-3, max_iter::Integer=15, verbose::Bool=true) where {T}
     @assert 0.8 <= ρ_thres <= 1 "Optional input `ρ_thres` must be a value in the interval [0.8, 1]"
     @assert 1e-5 <= tol <= 1 "Optional input `tol` must be a value in the interval [1e-5, 1]"
     @assert 1 < max_iter <= 20 "Optional input `max_iter` must be an integer in the interval (1, 20]."
@@ -27,11 +27,11 @@ function inter_spike_spectrum(s::Vector{T}; ρ_thres::Real = 0.99, tol::Real=1e-
     s ./= maximum(s)
 
     N = length(s)
-    Θ = generate_basis_functions(N)'
+    Θ = generate_basis_functions2(N)'
 
-    display("Size of Θ is: $(size(sparse(Θ)))")
+    #display("Size of Θ is: $(size(sparse(Θ)))")
 
-    return compute_spectrum_according_to_threshold(s, sparse(Θ), ρ_thres, tol, max_iter, verbose)
+    return compute_spectrum_according_to_threshold3(s, sparse(Θ), ρ_thres, tol, max_iter, verbose)
 end
 
 """
@@ -50,21 +50,42 @@ function inter_spike_spectrum2(s::Vector{T}; ρ_thres::Real = 0.99, tol::Real=1e
     N = length(s)
 
     non_unique_idx  = non_unique_lines(N)
-    Θ = generate_basis_functions(N)
+    Θ = generate_basis_functions2(N)
     size_full = size(Θ,1)
     full_idx = collect(1:size(Θ,1))
     setdiff!(full_idx, non_unique_idx)
 
-    display("Size of Θ is: $(size(sparse(view(Θ,full_idx,:)')))")
+    #display("Size of Θ is: $(size(sparse(view(Θ,full_idx,:)')))")
 
     return compute_spectrum_according_to_threshold2(s, sparse(view(Θ,full_idx,:)'), ρ_thres, tol, max_iter, full_idx, size_full, verbose)
+end
+
+"""
+    hallo 2
+"""
+function inter_spike_spectrum(s::Vector{T}; ρ_thres::Real = 0.99, tol::Real=1e-3, max_iter::Integer=15, verbose::Bool=true) where {T}
+    @assert 0.8 <= ρ_thres <= 1 "Optional input `ρ_thres` must be a value in the interval [0.8, 1]"
+    @assert 1e-5 <= tol <= 1 "Optional input `tol` must be a value in the interval [1e-5, 1]"
+    @assert 1 < max_iter <= 20 "Optional input `max_iter` must be an integer in the interval (1, 20]."
+
+    # normalization
+    s = (s.-mean(s)) ./ std(s)
+    s .-= minimum(s)
+    s ./= maximum(s)
+
+    N = length(s)
+    Θ = generate_basis_functions(N)'
+
+    #display("Size of Θ is: $(size(sparse(Θ)))")
+
+    return compute_spectrum_according_to_threshold(s, sparse(Θ), ρ_thres, tol, max_iter, verbose)
 end
 
 """
     Determine the right regularization parameter with respect to ρ_thres & tol
     using the Newton-method.
 """
-function compute_spectrum_according_to_threshold(s::Vector, Θ::SparseMatrixCSC, ρ_thres::Real, tol::Real, max_iter::Integer, verbose::Bool)
+function compute_spectrum_according_to_threshold3(s::Vector, Θ::SparseMatrixCSC, ρ_thres::Real, tol::Real, max_iter::Integer, verbose::Bool)
     abs_tol = 1e-6
     # initial Lambda-step for estimating an upper bound for λ
     lambda_step = 0.5
@@ -78,21 +99,21 @@ function compute_spectrum_according_to_threshold(s::Vector, Θ::SparseMatrixCSC,
                 if verbose
                     println("Algorithm stopped due to maximum number of λ's were tried without convergence to the specified `ρ_thres`. Perfect deomposition achieved.")
                 end
-                spectrum_i = pool_frequencies(y_act, length(s))
+                spectrum_i = pool_frequencies3(y_act, length(s))
                 spectrum_i = spectrum_i ./ sum(spectrum_i)
-                spectrum, y = compute_spectrum_according_to_actual_spectrum(spectrum_i, s, Θ, actual_lambda)
+                spectrum, y = compute_spectrum_according_to_actual_spectrum3(spectrum_i, s, Θ, actual_lambda)
                 return spectrum, cor(vec(regenerate_signal(Θ, y)), s)
             else
                 if verbose
                     println("Algorithm stopped due to maximum number of λ's were tried without convergence to the specified `ρ_thres`")
                 end
-                spec = pool_frequencies(y_act, length(s))
+                spec = pool_frequencies3(y_act, length(s))
                 spec = spec ./ sum(spec)
                 return spec , ρ_act
             end
             break
         elseif abs(ρ_act - ρ_thres) <= tol
-            spec = pool_frequencies(y_act, length(s))
+            spec = pool_frequencies3(y_act, length(s))
             spec = spec ./ sum(spec)
             return spec , ρ_act
         end
@@ -174,11 +195,66 @@ function compute_spectrum_according_to_threshold2(s::Vector, Θ::SparseMatrixCSC
     end
 end
 
+function compute_spectrum_according_to_threshold(s::Vector, Θ::SparseMatrixCSC, ρ_thres::Real, tol::Real, max_iter::Integer, verbose::Bool)
+    abs_tol = 1e-6
+    # initial Lambda-step for estimating an upper bound for λ
+    lambda_step = 0.5
+    lambda_max, lambda_min, y_act, ρ_act = find_lambda_max(s, Θ, lambda_step, ρ_thres)
+    actual_lambda = 0
+    # bisection search
+    for i = 1:max_iter
+        # check whether max iterations or tolerance-level reached
+        if i == max_iter
+            if ρ_act > 1 - abs_tol
+                if verbose
+                    println("Algorithm stopped due to maximum number of λ's were tried without convergence to the specified `ρ_thres`. Perfect deomposition achieved.")
+                end
+                spectrum_i = pool_frequencies(y_act, length(s))
+                spectrum_i = spectrum_i ./ sum(spectrum_i)
+                spectrum, y = compute_spectrum_according_to_actual_spectrum(spectrum_i, s, Θ, actual_lambda)
+                return spectrum, cor(vec(regenerate_signal(Θ, y)), s)
+            else
+                if verbose
+                    println("Algorithm stopped due to maximum number of λ's were tried without convergence to the specified `ρ_thres`")
+                end
+                spec = pool_frequencies(y_act, length(s))
+                spec = spec ./ sum(spec)
+                return spec , ρ_act
+            end
+            break
+        elseif abs(ρ_act - ρ_thres) <= tol
+            spec = pool_frequencies(y_act, length(s))
+            spec = spec ./ sum(spec)
+            return spec , ρ_act
+        end
+
+        # try new lambda
+        actual_lambda = lambda_min + (lambda_max - lambda_min)/2
+        # make the regression with specific lambda
+        path = glmnet(Θ, @view s[:]; lambda = [actual_lambda])
+        # check whether the regenerated signal matches with the given threshold
+        rr = cor(vec(regenerate_signal(Θ, path.betas)), s)
+
+        # pick the new bisection interval
+        if isnan(rr)
+            lambda_max = actual_lambda
+        elseif rr < ρ_thres
+            lambda_max = actual_lambda
+            y_act[:] = path.betas
+            ρ_act = rr
+        elseif rr > ρ_thres
+            lambda_min = actual_lambda
+            ρ_act = rr
+            y_act[:] = path.betas
+        end
+    end
+end
+
 """
     Determine the right regularization parameter with respect to ρ_thres & tol
     using the Newton-method.
 """
-function compute_spectrum_according_to_actual_spectrum(spectrum_i::Vector, s::Vector,  Θ::SparseMatrixCSC, λ_max::Real)
+function compute_spectrum_according_to_actual_spectrum3(spectrum_i::Vector, s::Vector,  Θ::SparseMatrixCSC, λ_max::Real)
     abs_tol = 1e-6
     max_iter = 10 # precision
     λ_min = 0
@@ -191,7 +267,7 @@ function compute_spectrum_according_to_actual_spectrum(spectrum_i::Vector, s::Ve
         # make the regression with specific lambda
         path = glmnet(Θ, @view s[:]; lambda = [actual_λ])
         y_act[:] = path.betas
-        spectrum[:] = pool_frequencies(y_act, length(s))
+        spectrum[:] = pool_frequencies3(y_act, length(s))
         spectrum = spectrum ./ sum(spectrum)
         # check whether the spectrum matches with the initial spectrum (input)
         rr = cor(spectrum, spectrum_i)
@@ -232,6 +308,33 @@ function compute_spectrum_according_to_actual_spectrum2(spectrum_i::Vector, s::V
     end
     return spectrum, y_act
 end
+function compute_spectrum_according_to_actual_spectrum(spectrum_i::Vector, s::Vector,  Θ::SparseMatrixCSC, λ_max::Real, unique_idx::Vector, size_full::Integer)
+    abs_tol = 1e-6
+    max_iter = 10 # precision
+    λ_min = 0
+    y_act = zeros(size(Θ,2))
+    spectrum = zeros(size(spectrum_i))
+    # bisection search
+    for i = 1:max_iter
+        # try new lambda
+        actual_λ = λ_min + (λ_max - λ_min)/2
+        # make the regression with specific lambda
+        path = glmnet(Θ, @view s[:]; lambda = [actual_λ])
+        y_act[:] = path.betas
+        spectrum[:] = pool_frequencies(y_act, length(s), unique_idx, size_full)
+        spectrum = spectrum ./ sum(spectrum)
+        # check whether the spectrum matches with the initial spectrum (input)
+        rr = cor(spectrum, spectrum_i)
+
+        # pick the new bisection interval
+        if rr > 1-abs_tol
+            λ_max = actual_λ
+        elseif rr < 1-abs_tol
+            λ_min = actual_λ
+        end
+    end
+    return spectrum, y_act
+end
 
 # regenerate a decomposed signal from basis functions and its coefficients
 function regenerate_signal(Θ::SparseMatrixCSC, coefs::CompressedPredictorMatrix)
@@ -240,7 +343,7 @@ function regenerate_signal(Θ::SparseMatrixCSC, coefs::CompressedPredictorMatrix
 end
 
 # pool the same frequencies
-function pool_frequencies(y::Vector, N::Integer)
+function pool_frequencies3(y::Vector, N::Integer)
     y = abs.(y)
     spectrum = zeros(N)
     cnt = 1
@@ -261,6 +364,22 @@ function pool_frequencies2(yy::Vector, N::Integer, unique_idx::Vector, size_full
     spectrum = zeros(N)
     cnt = 1
     for i = 1:N
+        occs = sum(y[cnt:cnt+i-1] .> 0)
+        if occs>0
+            spectrum[i] = sum(y[cnt:cnt+i-1]) / occs
+        else
+            spectrum[i] = 0
+        end
+        cnt += i
+    end
+    return spectrum
+end
+function pool_frequencies(y::Vector, N::Integer)
+    y = abs.(y)
+    M = Int(ceil(N/2))
+    spectrum = zeros(M)
+    cnt = 1
+    for i = 1:M
         occs = sum(y[cnt:cnt+i-1] .> 0)
         if occs>0
             spectrum[i] = sum(y[cnt:cnt+i-1]) / occs
@@ -310,6 +429,19 @@ end
 """
 function generate_basis_functions(N::Int)
     @assert N > 0
+    M = sum(1:Int(ceil(N/2)))
+
+    num_of_basis_functions = M
+    basis = zeros(num_of_basis_functions, N)
+    cnt = 1
+    for i = 1:Int(ceil(N/2))
+       basis[cnt:cnt+i-1,:] = create_single_basis_function(N, i);
+       cnt = cnt + i;
+    end
+    return basis
+end
+function generate_basis_functions2(N::Int)
+    @assert N > 0
     num_of_basis_functions = sum(1:N)
     basis = zeros(num_of_basis_functions, N)
     cnt = 1
@@ -319,6 +451,8 @@ function generate_basis_functions(N::Int)
     end
     return basis
 end
+
+
 
 """
     Create a spike-basis functions of length `N` and inter-spike-interval
