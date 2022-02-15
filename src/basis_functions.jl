@@ -254,7 +254,7 @@ end
     Determine the right regularization parameter with respect to ρ_thres & tol
     using the Newton-method.
 """
-function compute_spectrum_according_to_actual_spectrum3(spectrum_i::Vector, s::Vector,  Θ::SparseMatrixCSC, λ_max::Real)
+function compute_spectrum_according_to_actual_spectrum(spectrum_i::Vector, s::Vector,  Θ::SparseMatrixCSC, λ_max::Real)
     abs_tol = 1e-6
     max_iter = 10 # precision
     λ_min = 0
@@ -267,7 +267,7 @@ function compute_spectrum_according_to_actual_spectrum3(spectrum_i::Vector, s::V
         # make the regression with specific lambda
         path = glmnet(Θ, @view s[:]; lambda = [actual_λ])
         y_act[:] = path.betas
-        spectrum[:] = pool_frequencies3(y_act, length(s))
+        spectrum[:] = pool_frequencies(y_act, length(s))
         spectrum = spectrum ./ sum(spectrum)
         # check whether the spectrum matches with the initial spectrum (input)
         rr = cor(spectrum, spectrum_i)
@@ -308,7 +308,7 @@ function compute_spectrum_according_to_actual_spectrum2(spectrum_i::Vector, s::V
     end
     return spectrum, y_act
 end
-function compute_spectrum_according_to_actual_spectrum(spectrum_i::Vector, s::Vector,  Θ::SparseMatrixCSC, λ_max::Real, unique_idx::Vector, size_full::Integer)
+function compute_spectrum_according_to_actual_spectrum3(spectrum_i::Vector, s::Vector,  Θ::SparseMatrixCSC, λ_max::Real, unique_idx::Vector, size_full::Integer)
     abs_tol = 1e-6
     max_iter = 10 # precision
     λ_min = 0
@@ -321,7 +321,7 @@ function compute_spectrum_according_to_actual_spectrum(spectrum_i::Vector, s::Ve
         # make the regression with specific lambda
         path = glmnet(Θ, @view s[:]; lambda = [actual_λ])
         y_act[:] = path.betas
-        spectrum[:] = pool_frequencies(y_act, length(s), unique_idx, size_full)
+        spectrum[:] = pool_frequencies3(y_act, length(s), unique_idx, size_full)
         spectrum = spectrum ./ sum(spectrum)
         # check whether the spectrum matches with the initial spectrum (input)
         rr = cor(spectrum, spectrum_i)
