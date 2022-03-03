@@ -136,3 +136,5 @@ end
     @test abs(ρ - threshold) <= 1e-3
     @test numpeaks2 < numpeaks1
 end
+
+true
