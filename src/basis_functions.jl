@@ -21,11 +21,11 @@ struct STLS <: AbstractRegressionMethod end
     `ρ_thres = 0.99`: The agreement of the regenerated decomposed signal with the
                       true signal. This depends on the LASSO regularization parameter
                       `λ`. `λ` gets adjusted automatically with respect to `ρ_thres`.
-    `tol = 1e-2`: Allowed tolerance between `ρ_thres` and `ρ`.
+    `tol = 1e-3`: Allowed tolerance between `ρ_thres` and `ρ`.
     `max_iter = 15`: Determines after how many tried Lambdas the algorithm stopps.
     `verbose::Bool=true`: If true, warning messages enabled.
 """
-function inter_spike_spectrum(s::Vector{T}; method::String="lasso", ρ_thres::Real = 0.99, tol::Real=1e-2, max_iter::Integer=15, verbose::Bool=true) where {T}
+function inter_spike_spectrum(s::Vector{T}; method::String="lasso", ρ_thres::Real = 0.99, tol::Real=1e-3, max_iter::Integer=15, verbose::Bool=true) where {T}
     @assert 0.8 <= ρ_thres <= 1 "Optional input `ρ_thres` must be a value in the interval [0.8, 1]"
     @assert 1e-5 <= tol <= 1 "Optional input `tol` must be a value in the interval [1e-5, 1]"
     @assert 1 < max_iter <= 20 "Optional input `max_iter` must be an integer in the interval (1, 20]."

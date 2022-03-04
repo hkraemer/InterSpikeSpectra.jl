@@ -98,6 +98,21 @@ s[1:period2:end] .=1
 @time spectrum1, ρ = inter_spike_spectrum(s; ρ_thres = threshold, tol)
 @time spectrum2, ρ2 = inter_spike_spectrum(s; method="STLS", ρ_thres = threshold, tol)
 
+maxis1, max_idx1 = get_maxima(spectrum1)
+maxis2, max_idx2 = get_maxima(spectrum2)
+
+@test length(maxis1) == 6
+@test length(maxis2) == 8 
+@test max_idx1 == [3,7,14,21,28,42]
+@test max_idx2 == [3,6,9,12,14,21,28,42]
+@test maxis1[1] > 0.324
+@test maxis1[4] > 0.326
+@test maxis1[6] > 0.322
+@test maxis2[1] > 0.161
+@test maxis2[6] > 0.279
+@test maxis2[8] > 0.100
+
+
 
 N = length(s)
 M = Int(ceil(N/2))

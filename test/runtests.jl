@@ -82,10 +82,49 @@ println("Begin testing InterSpikeSpectra.jl...")
     spectrum, _ = inter_spike_spectrum(test_tauRR; ρ_thres= threshold, tol = tol, max_iter = maxcycles)
 
     maxis, max_idx = get_maxima(spectrum)
-    t_idx = maxis .> 0.2
+    t_idx = maxis .> 0.23
     peak_idxs = max_idx[t_idx]
 
     @test sum(rem.(peak_idxs, period1)) == 0
+end
+
+
+@testset "LASSO & STLS" begin
+    
+    Random.seed!(1234)
+    N = 300
+    s = zeros(N)
+    period1 = 3
+    period2 = 7
+    period3 = 14
+    period4 = 87
+    s[2:period1:end].= 1
+    s[1:period2:end] .=1
+    s[9:period3:end] .= 1
+    s[8:period4:end] .= 1
+
+    s += 0.05.*randn(N)
+
+    threshold = 0.99
+    tol = 1e-3
+    
+    spectrum1, ρ1 = inter_spike_spectrum(s; ρ_thres = threshold, tol)
+    spectrum2, ρ2 = inter_spike_spectrum(s; method="STLS", ρ_thres = threshold, tol)
+
+    maxis1, max_idx1 = get_maxima(spectrum1)
+    maxis2, max_idx2 = get_maxima(spectrum2)
+
+    @test length(maxis1) == 6
+    @test length(maxis2) == 8 
+    @test max_idx1 == [3,7,14,21,28,42]
+    @test max_idx2 == [3,6,9,12,14,21,28,42]
+    @test maxis1[1] > 0.324
+    @test maxis1[4] > 0.326
+    @test maxis1[6] > 0.322
+    @test maxis2[1] > 0.161
+    @test maxis2[6] > 0.279
+    @test maxis2[8] > 0.100
+
 end
 
 @testset "Perfect spike train" begin
@@ -125,16 +164,18 @@ end
 
     threshold = 0.995
     spectrum1, ρ = inter_spike_spectrum(s; ρ_thres = threshold, tol = tol, max_iter = maxcycles)
-    maxis, _ = get_maxima(spectrum1)
-    numpeaks1 = length(maxis)
+    maxis1, _ = get_maxima(spectrum1)
+    numpeaks1 = length(maxis1)
     @test abs(ρ - threshold) <= tol
 
     threshold = 0.85
     spectrum2, ρ = inter_spike_spectrum(s; ρ_thres = threshold)
-    maxis, _ = get_maxima(spectrum2)
-    numpeaks2 = length(maxis)
+    maxis2, _ = get_maxima(spectrum2)
+    numpeaks2 = length(maxis2)
     @test abs(ρ - threshold) <= 1e-3
-    @test numpeaks2 < numpeaks1
+    @test numpeaks2 == numpeaks1
+    @test 0.07 > maxis1[1] > 0.069
+    @test 0.152 > maxis2[1] > 0.151
 end
 
 true
