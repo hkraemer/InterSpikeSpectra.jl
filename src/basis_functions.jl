@@ -327,7 +327,7 @@ end
 """
     generate_basis_functions(N::Int) → basis
 
-    Generate a matrix `basis` with all possible `sum(1:N)` spike-basis functions.
+    Generate a matrix `basis` with all possible `sum(1:ceil(N/2))` spike-basis functions.
     These functions are not independent, since we account for time shifts. Thus,
     `basis` is a set of linear-dependent basis- functions.
 """
@@ -339,8 +339,8 @@ function generate_basis_functions(N::Int)
     basis = zeros(num_of_basis_functions, N)
     cnt = 1
     for i = 1:Int(ceil(N/2))
-       basis[cnt:cnt+i-1,:] = create_single_basis_function(N, i);
-       cnt = cnt + i;
+       basis[cnt:cnt+i-1,:] = create_single_basis_function(N, i)
+       cnt += i
     end
     return basis
 end

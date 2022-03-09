@@ -58,7 +58,11 @@ println("Begin testing InterSpikeSpectra.jl...")
     threshold = 0.85
     tol = 1e-3
     spectrum, ρ = inter_spike_spectrum(test_tauRR; ρ_thres = threshold, tol = tol)
+    maxis, maxis_idx = get_maxima(spectrum)
     @test abs(ρ - threshold) < tol
+    @test maxis_idx == [period2, period1]
+    @test 0.53 < maxis[1] < 0.54
+    @test 0.46 < maxis[2] < 0.47
 
     threshold = 0.99
     tol = 1e-3
