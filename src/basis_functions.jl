@@ -1,11 +1,14 @@
 # Main functionality of the spike train decomposition and the obtained inter
 # spike spectrum
 
-# Define the two sparse regression techniques to be used
+# Define the two sparse regression techniques to be used and two regression types
 abstract type AbstractRegressionMethod end
+abstract type AbstractRegressionType end
 
 struct lasso <: AbstractRegressionMethod end
 struct STLS <: AbstractRegressionMethod end
+
+struct logit <: AbstractRegressionType end
 
 """
     inter_spike_spectrum(s::Vector; kwargs...) → spectrum, ρ
