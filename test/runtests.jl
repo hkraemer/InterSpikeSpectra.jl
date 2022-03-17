@@ -122,12 +122,12 @@ end
     @test length(maxis2) == 8 
     @test max_idx1 == [3,7,14,21,28,42]
     @test max_idx2 == [3,6,9,12,14,21,28,42]
-    @test maxis1[1] > 0.324
-    @test maxis1[4] > 0.326
-    @test maxis1[6] > 0.322
-    @test maxis2[1] > 0.161
-    @test maxis2[6] > 0.279
-    @test maxis2[8] > 0.100
+    @test maxis1[1] > 0.197
+    @test maxis1[4] > 0.396
+    @test maxis1[6] > 0.390
+    @test maxis2[1] > 0.084
+    @test maxis2[6] > 0.292
+    @test maxis2[8] > 0.209
 
 end
 
@@ -156,7 +156,7 @@ end
     @test length(max_idx) == 2
     @test max_idx[1] == period1
     @test max_idx[2] == period2 || max_idx[2] / max_idx[1] == period2
-    @test maxis[1] > maxis[2]
+    @test maxis[1] < maxis[2]
 
 end
 
@@ -177,9 +177,9 @@ end
     maxis2, _ = get_maxima(spectrum2)
     numpeaks2 = length(maxis2)
     @test abs(ρ - threshold) <= 1e-3
-    @test numpeaks2 == numpeaks1
-    @test 0.07 > maxis1[1] > 0.069
-    @test 0.152 > maxis2[1] > 0.151
+    @test numpeaks2 == 5 && numpeaks1 == 7
+    @test 0.053 < maxis1[1] < 0.054
+    @test 0.089 < maxis2[1] < 0.09
 end
 
 true

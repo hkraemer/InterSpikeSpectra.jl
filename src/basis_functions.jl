@@ -44,7 +44,7 @@ function inter_spike_spectrum(s::Vector{T}; method::String="lasso", ρ_thres::Re
         return compute_spectrum_according_to_threshold(reg_meth, s, sparse(Θ), ρ_thres, tol, max_iter, verbose)
     else
         reg_meth = STLS()
-        return compute_spectrum_according_to_threshold(reg_meth, s, Θ, ρ_thres, tol, max_iter, verbose)
+        return compute_spectrum_according_to_threshold(reg_meth, s, sparse(Θ), ρ_thres, tol, max_iter, verbose)
     end
 end
 
@@ -118,9 +118,10 @@ function compute_spectrum_according_to_threshold(reg_meth::STLS, s::Vector, Θ::
 
     abs_tol = 1e-6
     # lambda_max/ lambda_min correspond to the maximum/minimum value in the coeffs of least squares
-    y_act = pinv(Θ)*s     # least squares
+    #y_act = pinv(Θ)*s     # least squares
     #y_act = qr(Θ, Val(true))\s 
     #y_act = qr(Θ; ordering = Int32(1))\s   # this is for a sparse-type Θ
+    y_act = lsqr(Θ,s)
     lambda_maxx = maximum(y_act)
     lambda_max = maximum(y_act)
     lambda_min = minimum(y_act)
@@ -243,19 +244,25 @@ end
     
     Sequential Thresholded Least Squares sparse regression method
 """
-function stls(s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix}, lambda::Real; iterations::Integer=10)
-    coeffs = pinv(Θ)*s     # initial guess least squares
-    #coeffs = qr(Θ, Val(true))\s 
-    #coeffs = qr(Θ; ordering = Int32(1))\s # this is for a sparse-type Θ
+function stls(s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix}, lambda::Real)
+    max_iter = 10
+    tol = 1e-5
 
-    for k = 1:iterations
+    coeffs = lsqr(Θ,s) # initial guess least squares
+    biginds_old = deepcopy(coeffs)
+
+    k = 1
+    while k < max_iter
         smallinds = (abs.(coeffs).<lambda)  # find small coefficients 
         coeffs[smallinds] .= 0  # threshold these coeffs
-        biginds = smallinds .!= true
-        # regress onto remaining terms
-        coeffs[biginds] = pinv(Θ[:,biginds])*s
-        #coeffs[biginds] = qr(Θ[:,biginds], Val(true))\s
-        #coeffs[biginds] = qr(Θ[:,biginds]; ordering = Int32(1))\s # this is for a sparse-type Θ
+        biginds = .! smallinds
+        # check convergence
+        if maximum(abs.(biginds .- biginds_old)) < tol
+            break
+        end
+        coeffs[biginds] .= lsqr(Θ[:,biginds],s) # regress onto remaining terms
+        biginds_old = biginds
+        k += 1
     end
     return coeffs
 end
@@ -263,11 +270,7 @@ end
 # make a least-squares regression on the non-zero coefficients from the sparse regression
 function debias_coefficients!(coeffs::Vector, s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix})
     non_zero_idx = findall(x->x!=0, coeffs)
-    #Θ2 = Matrix(Θ)
-    #de_biased_coeffs = pinv(Θ2[:,non_zero_idx])*s
-    # de_biased_coeffs = qr(Θ2[:,non_zero_idx], Val(true))\s
-    de_biased_coeffs = qr(Θ[:,non_zero_idx]; ordering = Int32(1))\s
-
+    de_biased_coeffs = lsqr(Θ[:,non_zero_idx],s)
     coeffs[non_zero_idx] .= de_biased_coeffs
 end
 
@@ -284,12 +287,7 @@ function pool_frequencies(y::Vector, N::Integer)
     spectrum = zeros(M)
     cnt = 1
     for i = 1:M
-        occs = sum(y[cnt:cnt+i-1] .> 0)
-        if occs>0
-            spectrum[i] = sum(y[cnt:cnt+i-1]) / occs
-        else
-            spectrum[i] = 0
-        end
+        spectrum[i] = sum(y[cnt:cnt+i-1])
         cnt += i
     end
     return spectrum

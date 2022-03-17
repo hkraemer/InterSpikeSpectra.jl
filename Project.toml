@@ -5,6 +5,7 @@ version = "0.7.0"
 
 [deps]
 GLMNet = "8d5ece8b-de18-5317-b113-243142960cc6"
+IterativeSolvers = "42fd0dbc-a981-5370-80f2-aaf504508153"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
