@@ -53,7 +53,7 @@ end
     Determine the right LASSO-regularization parameter with respect to ρ_thres & tol
     using the Newton-method.
 """
-function compute_spectrum_according_to_threshold(reg_meth::lasso, reg_type::normal, s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix}, 
+function compute_spectrum_according_to_threshold(reg_meth::lasso, reg_type::AbstractRegressionType, s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix}, 
                                                                             ρ_thres::Real, tol::Real, max_iter::Integer, verbose::Bool)
 
     abs_tol = 1e-6
@@ -66,7 +66,7 @@ function compute_spectrum_according_to_threshold(reg_meth::lasso, reg_type::norm
         # try new lambda
         actual_lambda = lambda_min + (lambda_max - lambda_min)/2
         # make the regression with specific lambda
-        path = glmnet(Θ, @view s[:]; lambda = [actual_lambda])
+        path = lasso_regression(reg_type, Θ, view(s,:), actual_lambda)
         # check whether the regenerated signal matches with the given threshold
         rr = cor(vec(regenerate_signal(reg_type, Θ, path.betas)), s)
 
@@ -116,7 +116,7 @@ end
     Determine the right STLS-regularization parameter with respect to ρ_thres & tol
     using the Newton-method.
 """
-function compute_spectrum_according_to_threshold(reg_meth::STLS, reg_type::normal, s::Vector, Θ::AbstractMatrix, ρ_thres::Real, tol::Real, max_iter::Integer, verbose::Bool)
+function compute_spectrum_according_to_threshold(reg_meth::STLS, reg_type::AbstractRegressionType, s::Vector, Θ::AbstractMatrix, ρ_thres::Real, tol::Real, max_iter::Integer, verbose::Bool)
 
     abs_tol = 1e-6
     # lambda_max/ lambda_min correspond to the maximum/minimum value in the coeffs of least squares
@@ -176,7 +176,7 @@ end
     Determine the right LASSO-regularization parameter with respect to ρ_thres & tol
     using the Newton-method.
 """
-function compute_spectrum_according_to_actual_spectrum(reg_meth::lasso, reg_type::normal, spectrum_i::Vector, s::Vector,  Θ::Union{SparseMatrixCSC, AbstractMatrix}, λ_max::Real)
+function compute_spectrum_according_to_actual_spectrum(reg_meth::lasso, reg_type::AbstractRegressionType, spectrum_i::Vector, s::Vector,  Θ::Union{SparseMatrixCSC, AbstractMatrix}, λ_max::Real)
     abs_tol = 1e-6
     max_iter = 10 # precision
     λ_min = 0
@@ -187,7 +187,7 @@ function compute_spectrum_according_to_actual_spectrum(reg_meth::lasso, reg_type
         # try new lambda
         actual_λ = λ_min + (λ_max - λ_min)/2
         # make the regression with specific lambda
-        path = glmnet(Θ, @view s[:]; lambda = [actual_λ])
+        path = lasso_regression(reg_type, Θ, view(s,:), actual_λ)
         y_act[:] = path.betas
         debias_coefficients!(y_act, s, Θ) # coefficient de-biasing
         spectrum[:] = pool_frequencies(y_act, length(s))
@@ -209,7 +209,7 @@ end
     Determine the right STLS-regularization parameter with respect to ρ_thres & tol
     using the Newton-method.
 """
-function compute_spectrum_according_to_actual_spectrum(reg_meth::STLS, reg_type::normal, spectrum_i::Vector, s::Vector,  Θ::Union{SparseMatrixCSC, AbstractMatrix}, λ_min::Real, λ_max::Real)
+function compute_spectrum_according_to_actual_spectrum(reg_meth::STLS, reg_type::AbstractRegressionType, spectrum_i::Vector, s::Vector,  Θ::Union{SparseMatrixCSC, AbstractMatrix}, λ_min::Real, λ_max::Real)
 
     @assert λ_min < λ_max "λ_min must be smaller than λ_max."
     abs_tol = 1e-6
@@ -235,6 +235,16 @@ function compute_spectrum_according_to_actual_spectrum(reg_meth::STLS, reg_type:
         end
     end
     return spectrum, y_act
+end
+
+"""
+    lasso_regression wrapper dependent on the regression type
+"""
+function lasso_regression(reg_type::normal, Θ::Union{SparseMatrixCSC, AbstractMatrix}, s, actual_lambda::Real)
+    return glmnet(Θ, s[:]; lambda = [actual_lambda])
+end
+function lasso_regression(reg_type::logit, Θ::Union{SparseMatrixCSC, AbstractMatrix}, s, actual_lambda::Real)
+    return glmnet(Θ, s[:], Binomial(); lambda = [actual_lambda])
 end
 
 
@@ -265,6 +275,7 @@ function stls(reg_type::normal, s::Vector, Θ::Union{SparseMatrixCSC, AbstractMa
     end
     return coeffs
 end
+# TODO: Make stls for reg_type::logit
 
 # make a least-squares regression on the non-zero coefficients from the sparse regression
 function debias_coefficients!(coeffs::Vector, s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix})
@@ -299,14 +310,14 @@ end
 
 # estimate a maximum λ-value for which the correlation coefficient form the re-
 # generated signal and the input signal falls below `ρ_thres` or is NaN.
-function find_lambda_max(reg_type::normal, s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix}, lambda_step::Real, ρ_thres::Real)
+function find_lambda_max(reg_type::AbstractRegressionType, s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix}, lambda_step::Real, ρ_thres::Real)
     lambda = 0.
     lambda_min = 0.
     ρ_min = 1
     y_min = zeros(size(Θ,2))
     for i = 1:10000
         # make the regression with specific lambda
-        path = glmnet(Θ, @view s[:]; lambda = [lambda])
+        path = lasso_regression(reg_type, Θ, view(s,:), lambda)
         # check whether the regenerated signal matches with the given threshold
         rr = cor(vec(regenerate_signal(reg_type, Θ, path.betas)), s)
         if i == 1
