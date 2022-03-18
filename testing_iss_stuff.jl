@@ -42,10 +42,10 @@ end
 ## 
 begin
     using InterSpikeSpectra
-    threshold = 0.99
+    threshold = 0.95
     tol = 1e-3
 
-    N = 300
+    N = 1000
     s = zeros(N)
     period1 = 3
     period2 = 7
@@ -60,7 +60,7 @@ begin
     #@btime spectrum1, ρ1 = inter_spike_spectrum(s; ρ_thres = threshold, tol)
     #@btime spectrum2, ρ2 = inter_spike_spectrum(s; method="STLS", ρ_thres = threshold, tol)
 
-    @time spectrum1, ρ1 = inter_spike_spectrum(s; ρ_thres = threshold, tol)
+    #@time spectrum1, ρ1 = inter_spike_spectrum(s; ρ_thres = threshold, tol)
     @time spectrum2, ρ2 = inter_spike_spectrum(s; method="STLS", ρ_thres = threshold, tol)
 
 
