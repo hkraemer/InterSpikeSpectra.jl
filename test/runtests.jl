@@ -2,7 +2,7 @@ using InterSpikeSpectra
 using RecurrenceAnalysis
 using Test
 using Random
- 
+
 """
 Return the maxima of the given time series s and its indices
 """
@@ -113,7 +113,7 @@ end
     tol = 1e-3
     
     spectrum1, ρ1 = inter_spike_spectrum(s; ρ_thres = threshold, tol)
-    spectrum2, ρ2 = inter_spike_spectrum(s; method="STLS", ρ_thres = threshold, tol)
+    spectrum2, ρ2 = inter_spike_spectrum(s; method=STLS(), ρ_thres = threshold, tol)
 
     maxis1, max_idx1 = get_maxima(spectrum1)
     maxis2, max_idx2 = get_maxima(spectrum2)
