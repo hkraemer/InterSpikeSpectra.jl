@@ -77,6 +77,18 @@ println("Begin testing InterSpikeSpectra.jl...")
     @test peak_idxs[1] == period2
     @test peak_idxs[2] == period1
 
+    # Elastic net
+    alpha = 0.5
+    spectrum, ρ = inter_spike_spectrum(test_tauRR; alpha)
+    
+    maxis, max_idx = get_maxima(spectrum)
+    @test max_idx == [4, 8, 13, 16, 22]
+    t_idx = maxis .> 0.1
+    peak_idxs = max_idx[t_idx]
+    @test peak_idxs[1] == period2
+    @test peak_idxs[2] == period1
+    @test peak_idxs[3] == 2*period2
+
     # randomized peak heights
     Random.seed!(1234)
     threshold = 0.95

@@ -22,21 +22,25 @@ struct normal <: AbstractRegressionType end
     Keyword arguments:
     `method::AbstractRegressionMethod = lasso()` : The method for sparse regression. 
                         Pick either lasso() or STLS() (sequential thresholded least squares)
-    `regression_type::AbstractRegressionType = logit()` : Regression type. For probability 
+    `regression_type::AbstractRegressionType = normal()` : Regression type. For probability 
                         input (like the τ-recurrence rate), a logit regression is needed. 
                         If this is not the case, select normal().
     `ρ_thres = 0.99`:   The agreement of the regenerated decomposed signal with the
                         true signal. This depends on the LASSO regularization parameter
                         `λ`. `λ` gets adjusted automatically with respect to `ρ_thres`.
     `tol = 1e-3`:       Allowed tolerance between `ρ_thres` and `ρ`.
+    `alpha = 1`:        The wheight between LASSO and Ridge regression when `method == lasso()`. 
+                        1 corresponds to LASSO and 0 to pure Ridge regression. Values 
+                        between 0 and 1 correspond to an elastic net.
     `max_iter = 15`:    Determines after how many tried Lambdas the algorithm stopps.
     `verbose::Bool=true`: If true, warning messages are enabled.
 """
 function inter_spike_spectrum(s::Vector{T}; method::AbstractRegressionMethod=lasso(), regression_type::AbstractRegressionType=normal(), 
-                            ρ_thres::Real = 0.99, tol::Real=1e-3, max_iter::Integer=15, verbose::Bool=true) where {T}
-    @assert 0.8 <= ρ_thres <= 1 "Optional input `ρ_thres` must be a value in the interval [0.8, 1]"
-    @assert 1e-5 <= tol <= 1 "Optional input `tol` must be a value in the interval [1e-5, 1]"
-    @assert 1 < max_iter <= 20 "Optional input `max_iter` must be an integer in the interval (1, 20]."
+                            ρ_thres::Real = 0.99, alpha::Real=1, tol::Real=1e-3, max_iter::Integer=15, verbose::Bool=true) where {T}
+    @assert 0.8 ≤ ρ_thres ≤ 1 "Optional input `ρ_thres` must be a value in the interval [0.8, 1]"
+    @assert 1e-5 ≤ tol ≤ 1 "Optional input `tol` must be a value in the interval [1e-5, 1]"
+    @assert 1 < max_iter ≤ 20 "Optional input `max_iter` must be an integer in the interval (1, 20]."
+    @assert 0 ≤ alpha ≤ 1 "Optional input `alpha` must be in the interval [0, 1]."
 
     # normalization
     s = (s.-mean(s)) ./ std(s)
@@ -46,27 +50,28 @@ function inter_spike_spectrum(s::Vector{T}; method::AbstractRegressionMethod=las
     N = length(s)
     Θ = generate_basis_functions(N)'
 
-    return compute_spectrum_according_to_threshold(method, regression_type, s, sparse(Θ), ρ_thres, tol, max_iter, verbose)
+    return compute_spectrum_according_to_threshold(method, regression_type, s, sparse(Θ), ρ_thres, tol, max_iter, alpha, verbose)
 end
 
 """
     Determine the right LASSO-regularization parameter with respect to ρ_thres & tol
     using the Newton-method.
 """
-function compute_spectrum_according_to_threshold(reg_meth::lasso, reg_type::AbstractRegressionType, s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix}, 
-                                                                            ρ_thres::Real, tol::Real, max_iter::Integer, verbose::Bool)
+function compute_spectrum_according_to_threshold(reg_meth::lasso, reg_type::AbstractRegressionType, 
+    s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix}, ρ_thres::Real, tol::Real, max_iter::Integer, 
+    alpha::Real, verbose::Bool)
 
     abs_tol = 1e-6
     # initial Lambda-step for estimating an upper bound for λ
     lambda_step = 0.5
-    lambda_max, lambda_min, y_act, ρ_act = find_lambda_max(reg_type, s, Θ, lambda_step, ρ_thres)
+    lambda_max, lambda_min, y_act, ρ_act = find_lambda_max(reg_type, s, Θ, lambda_step, ρ_thres, alpha)
 
     # bisection search
     for i = 1:max_iter
         # try new lambda
         actual_lambda = lambda_min + (lambda_max - lambda_min)/2
         # make the regression with specific lambda
-        path = lasso_regression(reg_type, Θ, view(s,:), actual_lambda)
+        path = lasso_regression(reg_type, Θ, view(s,:), actual_lambda, alpha)
         # check whether the regenerated signal matches with the given threshold
         rr = cor(vec(regenerate_signal(reg_type, Θ, path.betas)), s)
 
@@ -91,7 +96,7 @@ function compute_spectrum_according_to_threshold(reg_meth::lasso, reg_type::Abst
                 debias_coefficients!(y_act, s, Θ) # coefficient de-biasing
                 spectrum_i = pool_frequencies(y_act, length(s))
                 spectrum_i = spectrum_i ./ sum(spectrum_i) # normalization
-                spectrum, y = compute_spectrum_according_to_actual_spectrum(reg_meth, reg_type, spectrum_i, s, Θ, actual_lambda)
+                spectrum, y = compute_spectrum_according_to_actual_spectrum(reg_meth, reg_type, spectrum_i, s, Θ, actual_lambda, alpha)
                 return spectrum, cor(vec(regenerate_signal(reg_type, Θ, y)), s)
             else
                 if verbose
@@ -116,7 +121,8 @@ end
     Determine the right STLS-regularization parameter with respect to ρ_thres & tol
     using the Newton-method.
 """
-function compute_spectrum_according_to_threshold(reg_meth::STLS, reg_type::AbstractRegressionType, s::Vector, Θ::AbstractMatrix, ρ_thres::Real, tol::Real, max_iter::Integer, verbose::Bool)
+function compute_spectrum_according_to_threshold(reg_meth::STLS, reg_type::AbstractRegressionType, 
+    s::Vector, Θ::AbstractMatrix, ρ_thres::Real, tol::Real, max_iter::Integer, alpha::Real, verbose::Bool)
 
     abs_tol = 1e-6
     # lambda_max/ lambda_min correspond to the maximum/minimum value in the coeffs of least squares
@@ -176,7 +182,8 @@ end
     Determine the right LASSO-regularization parameter with respect to ρ_thres & tol
     using the Newton-method.
 """
-function compute_spectrum_according_to_actual_spectrum(reg_meth::lasso, reg_type::AbstractRegressionType, spectrum_i::Vector, s::Vector,  Θ::Union{SparseMatrixCSC, AbstractMatrix}, λ_max::Real)
+function compute_spectrum_according_to_actual_spectrum(reg_meth::lasso, reg_type::AbstractRegressionType, 
+    spectrum_i::Vector, s::Vector,  Θ::Union{SparseMatrixCSC, AbstractMatrix}, λ_max::Real, alpha::Real)
     abs_tol = 1e-6
     max_iter = 10 # precision
     λ_min = 0
@@ -187,7 +194,7 @@ function compute_spectrum_according_to_actual_spectrum(reg_meth::lasso, reg_type
         # try new lambda
         actual_λ = λ_min + (λ_max - λ_min)/2
         # make the regression with specific lambda
-        path = lasso_regression(reg_type, Θ, view(s,:), actual_λ)
+        path = lasso_regression(reg_type, Θ, view(s,:), actual_λ, alpha)
         y_act[:] = path.betas
         debias_coefficients!(y_act, s, Θ) # coefficient de-biasing
         spectrum[:] = pool_frequencies(y_act, length(s))
@@ -240,11 +247,11 @@ end
 """
     lasso_regression wrapper dependent on the regression type
 """
-function lasso_regression(reg_type::normal, Θ::Union{SparseMatrixCSC, AbstractMatrix}, s, actual_lambda::Real)
-    return glmnet(Θ, s[:]; lambda = [actual_lambda])
+function lasso_regression(reg_type::normal, Θ::Union{SparseMatrixCSC, AbstractMatrix}, s, actual_lambda::Real, alpha::Real)
+    return glmnet(Θ, s[:]; lambda = [actual_lambda], alpha)
 end
-function lasso_regression(reg_type::logit, Θ::Union{SparseMatrixCSC, AbstractMatrix}, s, actual_lambda::Real)
-    return glmnet(Θ, s[:], Binomial(); lambda = [actual_lambda])
+function lasso_regression(reg_type::logit, Θ::Union{SparseMatrixCSC, AbstractMatrix}, s, actual_lambda::Real, alpha::Real)
+    return glmnet(Θ, s[:], GLMNet.Binomial(); lambda = [actual_lambda], alpha)
 end
 
 
@@ -310,14 +317,16 @@ end
 
 # estimate a maximum λ-value for which the correlation coefficient form the re-
 # generated signal and the input signal falls below `ρ_thres` or is NaN.
-function find_lambda_max(reg_type::AbstractRegressionType, s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix}, lambda_step::Real, ρ_thres::Real)
+function find_lambda_max(reg_type::AbstractRegressionType, s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix}, 
+    lambda_step::Real, ρ_thres::Real, alpha::Real)
+
     lambda = 0.
     lambda_min = 0.
     ρ_min = 1
     y_min = zeros(size(Θ,2))
     for i = 1:10000
         # make the regression with specific lambda
-        path = lasso_regression(reg_type, Θ, view(s,:), lambda)
+        path = lasso_regression(reg_type, Θ, view(s,:), lambda, alpha)
         # check whether the regenerated signal matches with the given threshold
         rr = cor(vec(regenerate_signal(reg_type, Θ, path.betas)), s)
         if i == 1
