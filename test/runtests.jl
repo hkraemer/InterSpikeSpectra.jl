@@ -58,7 +58,10 @@ println("Begin testing InterSpikeSpectra.jl...")
 
     threshold = 0.85
     tol = 1e-3
-    spectrum, ρ = inter_spike_spectrum(test_tauRR; ρ_thres = threshold, tol = tol)
+    spectrum, ρ = inter_spike_spectrum(test_tauRR; ρ_thres = threshold, tol = tol, regression_type=normal())
+    spectrum2, ρ2 = inter_spike_spectrum(test_tauRR; ρ_thres = threshold, tol = tol)
+    @test spectrum == spectrum2
+    @test ρ==ρ2
     maxis, maxis_idx = get_maxima(spectrum)
     @test abs(ρ - threshold) < tol
     @test maxis_idx == [period2, period1]
@@ -67,7 +70,7 @@ println("Begin testing InterSpikeSpectra.jl...")
 
     threshold = 0.99
     tol = 1e-3
-    spectrum, ρ = inter_spike_spectrum(test_tauRR)
+    spectrum, ρ = inter_spike_spectrum(test_tauRR; regression_type=normal())
 
     maxis, max_idx = get_maxima(spectrum)
     t_idx = maxis .> 0.1
@@ -80,7 +83,7 @@ println("Begin testing InterSpikeSpectra.jl...")
 
     # Elastic net
     alpha = 0.5
-    spectrum, ρ = inter_spike_spectrum(test_tauRR; alpha)
+    spectrum, ρ = inter_spike_spectrum(test_tauRR; alpha, regression_type=normal())
     
     maxis, max_idx = get_maxima(spectrum)
     @test max_idx == [4, 8, 13, 16, 22]
@@ -96,7 +99,7 @@ println("Begin testing InterSpikeSpectra.jl...")
     tol = 1e-3
     maxcycles = 20
     test_tauRR = abs.(randn(N)) .* test_tauRR2[1,:]
-    spectrum, _ = inter_spike_spectrum(test_tauRR; ρ_thres= threshold, tol = tol, max_iter = maxcycles)
+    spectrum, _ = inter_spike_spectrum(test_tauRR; ρ_thres= threshold, tol = tol, max_iter = maxcycles, regression_type=normal())
 
     maxis, max_idx = get_maxima(spectrum)
     t_idx = maxis .> 0.23
@@ -125,7 +128,7 @@ end
     threshold = 0.99
     tol = 1e-3
     
-    spectrum1, ρ1 = inter_spike_spectrum(s; ρ_thres = threshold, tol)
+    spectrum1, ρ1 = inter_spike_spectrum(s; ρ_thres = threshold, tol, regression_type=normal())
     spectrum2, ρ2 = inter_spike_spectrum(s; method=STLS(), ρ_thres = threshold, tol)
 
     maxis1, max_idx1 = get_maxima(spectrum1)
@@ -150,7 +153,7 @@ end
     period1 = 3
     s[2:period1:end].= 1
 
-    spectrum, ρ = inter_spike_spectrum(s)
+    spectrum, ρ = inter_spike_spectrum(s; regression_type=normal())
 
     @test ρ+ 1e-3 >= 1
     maxis, max_idx = get_maxima(spectrum)
@@ -163,7 +166,7 @@ end
 
     tol = 1e-4
     threshold = .99
-    spectrum, ρ = inter_spike_spectrum(s; tol = tol)
+    spectrum, ρ = inter_spike_spectrum(s; tol = tol, regression_type=normal())
     @test abs(ρ - threshold) < tol
     maxis, max_idx = get_maxima(spectrum)
     @test length(max_idx) == 2
@@ -185,7 +188,7 @@ end
     
     threshold = 0.99
     spectrum1, rho1 = inter_spike_spectrum(s; ρ_thres = threshold, regression_type=logit())
-    spectrum2, rho2 = inter_spike_spectrum(s; ρ_thres = threshold)
+    spectrum2, rho2 = inter_spike_spectrum(s; ρ_thres = threshold, regression_type=normal())
     
     peaks1, peaks1_idx = get_maxima(spectrum1)
     peaks2, peaks2_idx = get_maxima(spectrum2)
@@ -202,7 +205,7 @@ end
     
     threshold = 0.9
     spectrum1, rho1 = inter_spike_spectrum(s; ρ_thres = threshold, regression_type=logit())
-    spectrum2, rho2 = inter_spike_spectrum(s; ρ_thres = threshold)
+    spectrum2, rho2 = inter_spike_spectrum(s; ρ_thres = threshold, regression_type=normal())
     
     peaks1, peaks1_idx = get_maxima(spectrum1)
     peaks2, peaks2_idx = get_maxima(spectrum2)
@@ -225,13 +228,13 @@ end
     s = randn(50)
 
     threshold = 0.995
-    spectrum1, ρ = inter_spike_spectrum(s; ρ_thres = threshold, tol = tol, max_iter = maxcycles)
+    spectrum1, ρ = inter_spike_spectrum(s; ρ_thres = threshold, tol = tol, max_iter = maxcycles, regression_type=normal())
     maxis1, _ = get_maxima(spectrum1)
     numpeaks1 = length(maxis1)
     @test abs(ρ - threshold) <= tol
 
     threshold = 0.85
-    spectrum2, ρ = inter_spike_spectrum(s; ρ_thres = threshold)
+    spectrum2, ρ = inter_spike_spectrum(s; ρ_thres = threshold, regression_type=normal())
     maxis2, _ = get_maxima(spectrum2)
     numpeaks2 = length(maxis2)
     @test abs(ρ - threshold) <= 1e-3

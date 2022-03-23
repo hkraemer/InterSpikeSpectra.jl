@@ -1,14 +1,12 @@
 module InterSpikeSpectra
 
-using Statistics, LinearAlgebra, GLMNet, SparseArrays, IterativeSolvers
+using Statistics, LinearAlgebra, GLMNet, SparseArrays, IterativeSolvers, StatsBase
 using Revise
 
 include("basis_functions.jl")
 
 export inter_spike_spectrum
-export STLS
-export lasso
-export normal
-export logit
+export STLS, lasso
+export normal, logit, auto
 
 end

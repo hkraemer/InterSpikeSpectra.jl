@@ -10,6 +10,7 @@ struct STLS <: AbstractRegressionMethod end
 
 struct logit <: AbstractRegressionType end
 struct normal <: AbstractRegressionType end
+struct auto <: AbstractRegressionType end
 
 """
     inter_spike_spectrum(s::Vector; kwargs...) → spectrum, ρ
@@ -22,9 +23,11 @@ struct normal <: AbstractRegressionType end
     Keyword arguments:
     `method::AbstractRegressionMethod = lasso()` : The method for sparse regression. 
                         Pick either lasso() or STLS() (sequential thresholded least squares)
-    `regression_type::AbstractRegressionType = normal()` : Regression type. For probability 
-                        input (like the τ-recurrence rate), a logit regression is needed. 
-                        If this is not the case, select normal().
+    `regression_type::AbstractRegressionType = auto()` : Regression type. For probability 
+                        input (like the τ-recurrence rate), a logit regression is needed 
+                        'regression_type=logit()'. If this is not the case, select 
+                        'regression_type=normal()'. By default it is automatically set with 
+                        respect to the distribution of `s`.
     `ρ_thres = 0.99`:   The agreement of the regenerated decomposed signal with the
                         true signal. This depends on the LASSO regularization parameter
                         `λ`. `λ` gets adjusted automatically with respect to `ρ_thres`.
@@ -35,7 +38,7 @@ struct normal <: AbstractRegressionType end
     `max_iter = 15`:    Determines after how many tried Lambdas the algorithm stopps.
     `verbose::Bool=true`: If true, warning messages are enabled.
 """
-function inter_spike_spectrum(s::Vector{T}; method::AbstractRegressionMethod=lasso(), regression_type::AbstractRegressionType=normal(), 
+function inter_spike_spectrum(s::Vector{T}; method::AbstractRegressionMethod=lasso(), regression_type::AbstractRegressionType=auto(), 
                             ρ_thres::Real = 0.99, alpha::Real=1, tol::Real=1e-3, max_iter::Integer=15, verbose::Bool=true) where {T}
     @assert 0.8 ≤ ρ_thres ≤ 1 "Optional input `ρ_thres` must be a value in the interval [0.8, 1]"
     @assert 1e-5 ≤ tol ≤ 1 "Optional input `tol` must be a value in the interval [1e-5, 1]"
@@ -46,6 +49,17 @@ function inter_spike_spectrum(s::Vector{T}; method::AbstractRegressionMethod=las
     s = (s.-mean(s)) ./ std(s)
     s .-= minimum(s)
     s ./= maximum(s)
+
+    # select regression type based on distribution of the input data
+    if typeof(regression_type)==auto
+        h = fit(Histogram, s,  nbins=5)
+        f_bins = sum(h.weights .!= 0)
+        if f_bins > 2
+            regression_type = normal()
+        elseif f_bins <=2
+            regression_type = logit()
+        end
+    end
 
     N = length(s)
     Θ = generate_basis_functions(N)'
