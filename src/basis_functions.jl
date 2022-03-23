@@ -63,7 +63,7 @@ function compute_spectrum_according_to_threshold(reg_meth::lasso, reg_type::Abst
 
     abs_tol = 1e-6
     # initial Lambda-step for estimating an upper bound for λ
-    lambda_step = 0.5
+    lambda_step = 0.2
     lambda_max, lambda_min, y_act, ρ_act = find_lambda_max(reg_type, s, Θ, lambda_step, ρ_thres, alpha)
 
     # bisection search
@@ -71,21 +71,19 @@ function compute_spectrum_according_to_threshold(reg_meth::lasso, reg_type::Abst
         # try new lambda
         actual_lambda = lambda_min + (lambda_max - lambda_min)/2
         # make the regression with specific lambda
-        path = lasso_regression(reg_type, Θ, view(s,:), actual_lambda, alpha)
+        y_act[:] = lasso_regression(reg_type, Θ, view(s,:), actual_lambda, alpha)
         # check whether the regenerated signal matches with the given threshold
-        rr = cor(vec(regenerate_signal(reg_type, Θ, path.betas)), s)
+        rr = cor(vec(regenerate_signal(reg_type, Θ, y_act)), s)
 
         # pick the new bisection interval
         if isnan(rr)
             lambda_max = actual_lambda
         elseif rr < ρ_thres
             lambda_max = actual_lambda
-            y_act[:] = path.betas
             ρ_act = rr
         elseif rr > ρ_thres
             lambda_min = actual_lambda
             ρ_act = rr
-            y_act[:] = path.betas
         end
         # check whether max iterations or tolerance-level reached
         if i == max_iter
@@ -194,8 +192,7 @@ function compute_spectrum_according_to_actual_spectrum(reg_meth::lasso, reg_type
         # try new lambda
         actual_λ = λ_min + (λ_max - λ_min)/2
         # make the regression with specific lambda
-        path = lasso_regression(reg_type, Θ, view(s,:), actual_λ, alpha)
-        y_act[:] = path.betas
+        y_act[:] = lasso_regression(reg_type, Θ, view(s,:), actual_λ, alpha)
         debias_coefficients!(y_act, s, Θ) # coefficient de-biasing
         spectrum[:] = pool_frequencies(y_act, length(s))
         spectrum = spectrum ./ sum(spectrum) # normalization
@@ -248,10 +245,19 @@ end
     lasso_regression wrapper dependent on the regression type
 """
 function lasso_regression(reg_type::normal, Θ::Union{SparseMatrixCSC, AbstractMatrix}, s, actual_lambda::Real, alpha::Real)
-    return glmnet(Θ, s[:]; lambda = [actual_lambda], alpha)
+    path = glmnet(Θ, s[:]; lambda = [actual_lambda], alpha)
+    return Vector(path.betas[:,1])
 end
 function lasso_regression(reg_type::logit, Θ::Union{SparseMatrixCSC, AbstractMatrix}, s, actual_lambda::Real, alpha::Real)
-    return glmnet(Θ, s[:], GLMNet.Binomial(); lambda = [actual_lambda], alpha)
+    # convert into necessary predictor-response matrix
+    N = length(s) 
+    counts = Int.(ceil.(N .* s))
+    counts2 = N .- counts
+    response_matrix = zeros(Int, N, 2)
+    response_matrix[:,2] .= counts
+    response_matrix[:,1] .= counts2
+    path = glmnet(Θ, response_matrix, GLMNet.Binomial(); lambda = [actual_lambda], alpha)
+    return Vector(path.betas[:,1])
 end
 
 
@@ -320,23 +326,24 @@ end
 function find_lambda_max(reg_type::AbstractRegressionType, s::Vector, Θ::Union{SparseMatrixCSC, AbstractMatrix}, 
     lambda_step::Real, ρ_thres::Real, alpha::Real)
 
-    lambda = 0.
+    lambda = lambda_step
     lambda_min = 0.
     ρ_min = 1
     y_min = zeros(size(Θ,2))
-    for i = 1:10000
+    for i = 1:100
         # make the regression with specific lambda
         path = lasso_regression(reg_type, Θ, view(s,:), lambda, alpha)
         # check whether the regenerated signal matches with the given threshold
-        rr = cor(vec(regenerate_signal(reg_type, Θ, path.betas)), s)
+        rr = cor(vec(regenerate_signal(reg_type, Θ, path)), s)
+        
         if i == 1
-            y_min[:] = vec(path.betas)
+            y_min[:] = path
             ρ_min = rr
         end
 
         if rr > ρ_thres
             lambda_min = lambda
-            y_min[:] = vec(path.betas)
+            y_min[:] = path
             ρ_min = rr
         elseif isnan(rr) || rr <= ρ_thres
             return lambda, lambda_min, y_min, ρ_min

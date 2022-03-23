@@ -39,6 +39,7 @@ function get_maxima(s::Vector{T}) where {T}
     end
     return maximas, maximas_idx
 end
+
 println("Begin testing InterSpikeSpectra.jl...")
 
 @testset "Simple spike train with randomized peaks" begin
@@ -172,6 +173,51 @@ end
 
 end
 
+@testset "Normal & logistic regression" begin
+
+    N = 300
+    M = Int.(ceil(N/2))
+    period1 = 3
+    period2 = 7
+    s = zeros(N)
+    s[period1:period1:end] .= 1
+    s[period2:period2:end] .= 1
+    
+    threshold = 0.99
+    spectrum1, rho1 = inter_spike_spectrum(s; ρ_thres = threshold, regression_type=logit())
+    spectrum2, rho2 = inter_spike_spectrum(s; ρ_thres = threshold)
+    
+    peaks1, peaks1_idx = get_maxima(spectrum1)
+    peaks2, peaks2_idx = get_maxima(spectrum2)
+    
+    @test abs(rho1 - threshold) < 1e-3
+    @test abs(rho2 - threshold) < 1e-3
+    @test 0.5633 < peaks1[1] < 0.5634
+    @test 0.4366 < peaks1[2] < 0.4367
+    @test 0.332 < peaks2[1] < 0.334
+    @test peaks2[2] < 2e-15
+    @test 0.665 < peaks2[3] < 0.667
+    @test peaks1_idx == [3,7]
+    @test peaks2_idx == [3,7,21]
+    
+    threshold = 0.9
+    spectrum1, rho1 = inter_spike_spectrum(s; ρ_thres = threshold, regression_type=logit())
+    spectrum2, rho2 = inter_spike_spectrum(s; ρ_thres = threshold)
+    
+    peaks1, peaks1_idx = get_maxima(spectrum1)
+    peaks2, peaks2_idx = get_maxima(spectrum2)
+    
+    @test abs(rho1 - threshold) < 1e-3
+    @test abs(rho2 - threshold) < 1e-3
+    @test 0.5633 < peaks1[1] < 0.5634
+    @test 0.4366 < peaks1[2] < 0.4367
+    @test 0.5633 < peaks2[1] < 0.5634
+    @test 0.4366 < peaks2[2] < 0.4367
+    @test peaks1_idx == [3,7]
+    @test peaks2_idx == [3,7]
+
+end
+
 @testset "Random input" begin
     Random.seed!(1234)
     tol = 1e-4
@@ -189,8 +235,8 @@ end
     maxis2, _ = get_maxima(spectrum2)
     numpeaks2 = length(maxis2)
     @test abs(ρ - threshold) <= 1e-3
-    @test numpeaks2 == 5 && numpeaks1 == 7
-    @test 0.053 < maxis1[1] < 0.054
+    @test numpeaks2 == 5 && numpeaks1 == 8
+    @test 0.053 < maxis1[1] < 0.056
     @test 0.089 < maxis2[1] < 0.09
 end
 
