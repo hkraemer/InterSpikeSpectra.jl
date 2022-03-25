@@ -52,12 +52,18 @@ function inter_spike_spectrum(s::Vector{T}; method::AbstractRegressionMethod=las
 
     # select regression type based on distribution of the input data
     if typeof(regression_type)==auto
-        h = fit(Histogram, s,  nbins=5)
-        f_bins = sum(h.weights .!= 0)
-        if f_bins > 2
+        if typeof(method)==lasso
+            h = fit(Histogram, s,  nbins=5)
+            f_bins = sum(h.weights .!= 0)
+            if f_bins > 2
+                regression_type = normal()
+                verbose && println("Normal Lasso regression type selected.")
+            elseif f_bins <=2
+                regression_type = logit()
+                verbose && println("Logit Lasso regression type selected.")
+            end
+        else
             regression_type = normal()
-        elseif f_bins <=2
-            regression_type = logit()
         end
     end
 
