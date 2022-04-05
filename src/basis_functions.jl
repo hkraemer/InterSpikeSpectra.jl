@@ -120,12 +120,16 @@ function compute_spectrum_according_to_threshold(reg_meth::lasso, reg_type::Abst
                 if verbose
                     println("Algorithm stopped due to maximum number of λ's were tried without convergence to the specified `ρ_thres`")
                 end
+                if isnan(rr) # account for case where the last iterations yielded a NaN-value
+                    y_act[:] = lasso_regression(reg_type, Θ, view(s,:), lambda_min, alpha)
+                    # check whether the regenerated signal matches with the given threshold
+                    ρ_act = cor(vec(regenerate_signal(reg_type, Θ, y_act)), s)
+                end
                 debias_coefficients!(y_act, s, Θ) # coefficient de-biasing
                 spec = pool_frequencies(y_act, length(s))
                 spec = spec ./ sum(spec) # normalization
                 return spec , ρ_act
             end
-            break
         elseif abs(ρ_act - ρ_thres) <= tol
             debias_coefficients!(y_act, s, Θ) # coefficient de-biasing
             spec = pool_frequencies(y_act, length(s))
@@ -182,11 +186,14 @@ function compute_spectrum_according_to_threshold(reg_meth::STLS, reg_type::Abstr
                 if verbose
                     println("Algorithm stopped due to maximum number of λ's were tried without convergence to the specified `ρ_thres`")
                 end
+                if isnan(rr)
+                    y_act[:] = stls(reg_type, s, Θ, lambda_min)
+                    ρ_act = cor(vec(regenerate_signal(reg_type, Θ, y_act)), s)
+                end
                 spec = pool_frequencies(y_act, length(s))
                 spec = spec ./ sum(spec) # normalization
                 return spec , ρ_act
             end
-            break
         elseif abs(ρ_act - ρ_thres) <= tol
             spec = pool_frequencies(y_act, length(s))
             spec = spec ./ sum(spec) # normalization
@@ -264,11 +271,11 @@ end
 """
     lasso_regression wrapper dependent on the regression type
 """
-function lasso_regression(reg_type::normal, Θ::Union{SparseMatrixCSC, AbstractMatrix}, s, actual_lambda::Real, alpha::Real)
+function lasso_regression(reg_type::normal, Θ::Union{SparseMatrixCSC, AbstractMatrix}, s, actual_lambda::Real, alpha::Real=1)
     path = glmnet(Θ, s[:]; lambda = [actual_lambda], alpha)
     return Vector(path.betas[:,1])
 end
-function lasso_regression(reg_type::logit, Θ::Union{SparseMatrixCSC, AbstractMatrix}, s, actual_lambda::Real, alpha::Real)
+function lasso_regression(reg_type::logit, Θ::Union{SparseMatrixCSC, AbstractMatrix}, s, actual_lambda::Real, alpha::Real=1)
     # convert into necessary predictor-response matrix
     N = length(s) 
     counts = Int.(ceil.(N .* s))
