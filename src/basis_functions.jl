@@ -84,7 +84,7 @@ function compute_spectrum_according_to_threshold(reg_meth::lasso, reg_type::Abst
     abs_tol = 1e-6
     # initial Lambda-step for estimating an upper bound for λ
     lambda_step = 0.2
-    lambda_max, lambda_min, y_act, ρ_act = find_lambda_max(reg_type, s, Θ, lambda_step, ρ_thres, alpha)
+    lambda_max, lambda_min, y_act, _ = find_lambda_max(reg_type, s, Θ, lambda_step, ρ_thres, alpha)
 
     # bisection search
     for i = 1:max_iter
@@ -100,11 +100,11 @@ function compute_spectrum_according_to_threshold(reg_meth::lasso, reg_type::Abst
             lambda_max = actual_lambda
         elseif rr < ρ_thres
             lambda_max = actual_lambda
-            ρ_act = rr
         elseif rr > ρ_thres
             lambda_min = actual_lambda
-            ρ_act = rr
         end
+        ρ_act = rr
+        
         # check whether max iterations or tolerance-level reached
         if i == max_iter
             if ρ_act > 1 - abs_tol
@@ -166,11 +166,10 @@ function compute_spectrum_according_to_threshold(reg_meth::STLS, reg_type::Abstr
             lambda_max = actual_lambda
         elseif rr < ρ_thres
             lambda_max = actual_lambda
-            ρ_act = rr
         elseif rr > ρ_thres
             lambda_min = actual_lambda
-            ρ_act = rr
         end
+        ρ_act = rr
 
         # check whether max iterations or tolerance-level reached
         if i == max_iter
