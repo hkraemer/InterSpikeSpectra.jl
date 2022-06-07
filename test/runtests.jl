@@ -141,8 +141,8 @@ end
     @test maxis1[1] > 0.197
     @test maxis1[4] > 0.396
     @test maxis1[6] > 0.390
-    @test maxis2[1] > 0.084
-    @test maxis2[6] > 0.292
+    @test maxis2[1] > 0.073
+    @test maxis2[6] > 0.255
     @test maxis2[8] > 0.209
 
 end
